@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Send, ChevronLeft } from 'lucide-react';
 import { IMessage } from '../interfaces/message';
 import { createMessage, getMessage } from '../apis/message';
 import useAuthStore from '../store/authStore';
+import { io } from 'socket.io-client';
 
 interface ChatAreaProps {
   selectedChat: {
@@ -21,13 +22,40 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<IMessage[]>([]);
   const id = useAuthStore((state) => state.id);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const socket = io('http://localhost:3000', { withCredentials: true });
 
   useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (selectedChat) {
+      console.log(selectedChat);
+      socket.emit('setup', selectedChat.id);
+    }
+  }, [selectedChat]);
+
+  useEffect(() => {
+    socket.on('message recieved', (message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+    });
+  }, [socket]);
+
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
     if (message.length !== 0) return;
     const fetch = async () => {
       if (!selectedChat) return;
       const chats = await getMessage(selectedChat.id);
       setMessages(chats);
+      if (chatRef.current) {
+        chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      }
     };
     fetch();
   }, [selectedChat, message.length]);
@@ -50,6 +78,15 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
         user: chat.user,
       },
     ]);
+    socket.emit('new message', {
+      id: chat.id,
+      content: message,
+      type: chat.type,
+      communityId: chat.communityId,
+      isDeleted: chat.isDeleted,
+      timestamp: chat.timestamp,
+      user: chat.user,
+    });
     setMessage('');
   }
 
@@ -81,7 +118,7 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-scroll no-scrollbar p-4 space-y-4">
+      <div ref={chatRef} className="flex-1 overflow-y-scroll no-scrollbar p-4 space-y-4">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.user.id === id ? 'justify-end' : 'justify-start'}`}>
             {msg.user.id !== id && (

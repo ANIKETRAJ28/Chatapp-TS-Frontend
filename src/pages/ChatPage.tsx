@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import ChatArea from '../components/ChartArea';
 import InfoSidebar from '../components/InfoSideBar';
 import Sidebar from '../components/SideBar';
-// import { io } from 'socket.io-client';
 import { IGroupCommunity, IFriendCommunity, ICommunity } from '../interfaces/community';
 import { getCommunities } from '../apis/community';
 
@@ -48,10 +47,6 @@ export default function ChatPage() {
     };
     fetch();
   }, []);
-
-  // useEffect(() => {
-  //   io('http://localhost:3000');
-  // }, []);
 
   return (
     <div className="flex flex-1 h-[90vh]">
