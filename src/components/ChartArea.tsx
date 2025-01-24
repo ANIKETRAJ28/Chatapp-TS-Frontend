@@ -23,7 +23,7 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
   const [messages, setMessages] = useState<IMessage[]>([]);
   const id = useAuthStore((state) => state.id);
   const chatRef = useRef<HTMLDivElement>(null);
-  const socket = io('http://localhost:3000', { withCredentials: true });
+  const socket = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
 
   useEffect(() => {
     if (chatRef.current) {
