@@ -36,7 +36,7 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
       console.log(selectedChat);
       socket.emit('setup', selectedChat.id);
     }
-  }, [selectedChat]);
+  }, [selectedChat, socket]);
 
   useEffect(() => {
     socket.on('message recieved', (message) => {

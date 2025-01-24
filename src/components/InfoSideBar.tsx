@@ -37,6 +37,7 @@ export default function InfoSidebar({ selectedChat, onBack }: InfoSidebarProps) 
       setMembers(membersWithRole);
     };
     fetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat]);
 
   const friendInfo = {

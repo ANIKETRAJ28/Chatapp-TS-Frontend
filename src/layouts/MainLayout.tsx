@@ -22,6 +22,7 @@ export default function Layout({ children }: { children: React.ReactElement }) {
 
   useEffect(() => {
     setUserToStore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
