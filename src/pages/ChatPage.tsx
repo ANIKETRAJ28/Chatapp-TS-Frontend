@@ -6,11 +6,13 @@ import { IGroupCommunity, IFriendCommunity, ICommunity } from '../interfaces/com
 import { getCommunities } from '../apis/community';
 
 export default function ChatPage() {
-  const [activeChat, setActiveChat] = useState<'friend' | 'group'>('friend');
+  const [activeChat, setActiveChat] = useState<'friend' | 'group' | 'search'>('friend');
   const [showInfo, setShowInfo] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [friends, setFriends] = useState<IFriendCommunity[]>([]);
   const [groups, setGroups] = useState<IGroupCommunity[]>([]);
+
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [selectedChat, setSelectedChat] = useState<ICommunity | null>(null);
 
@@ -18,7 +20,7 @@ export default function ChatPage() {
     id: string,
     name: string,
     avatar: string,
-    type: 'friend' | 'group',
+    type: 'friend' | 'group' | 'search',
     users: number,
     description?: string,
   ) => {
@@ -57,11 +59,22 @@ export default function ChatPage() {
           activeChat={activeChat}
           setActiveChat={setActiveChat}
           onSelectChat={handleSelectChat}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
         />
       </div>
 
       <div className={`${!showSidebar || selectedChat ? 'flex' : 'hidden'} md:flex flex-1`}>
-        <ChatArea selectedChat={selectedChat} onInfoClick={() => setShowInfo(!showInfo)} onBack={handleBack} />
+        <ChatArea
+          selectedChat={selectedChat}
+          setSelectedChat={setSelectedChat}
+          setActiveChat={setActiveChat}
+          friends={friends}
+          setFriends={setFriends}
+          setSearchQuery={setSearchQuery}
+          onInfoClick={() => setShowInfo(!showInfo)}
+          onBack={handleBack}
+        />
       </div>
 
       <div

@@ -4,7 +4,7 @@ export interface ICommunity {
   id: string;
   name: string;
   avatar: string;
-  type: 'group' | 'friend';
+  type: 'group' | 'friend' | 'search';
   users: number;
   description?: string;
 }

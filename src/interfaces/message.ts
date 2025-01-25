@@ -1,3 +1,4 @@
+import { IFriendCommunity } from './community';
 import { IUser } from './user';
 
 export interface IMessage {
@@ -8,4 +9,9 @@ export interface IMessage {
   communityId: string;
   isDeleted: boolean;
   user: IUser;
+}
+
+export interface CreateMessageResponse {
+  community: IFriendCommunity;
+  message: IMessage;
 }

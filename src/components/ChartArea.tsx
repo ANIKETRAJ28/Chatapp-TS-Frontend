@@ -1,29 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
 import { Send, ChevronLeft } from 'lucide-react';
-import { IMessage } from '../interfaces/message';
-import { createMessage, getMessage } from '../apis/message';
+import { CreateMessageResponse, IMessage } from '../interfaces/message';
+import { createMessage, createMessageAndCommunity, getMessage } from '../apis/message';
 import useAuthStore from '../store/authStore';
 import { io } from 'socket.io-client';
+import { ICommunity, IFriendCommunity } from '../interfaces/community';
 
 interface ChatAreaProps {
   selectedChat: {
     id: string;
     name: string;
     avatar: string;
-    type: 'friend' | 'group';
+    type: 'friend' | 'group' | 'search';
     users: number;
     description?: string;
   } | null;
+  setSelectedChat: (community: ICommunity) => void;
+  setActiveChat: (type: 'friend' | 'group' | 'search') => void;
+  friends: IFriendCommunity[];
+  setFriends: (user: IFriendCommunity[]) => void;
+  setSearchQuery: (s: string) => void;
   onInfoClick: () => void;
   onBack: () => void;
 }
 
-export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatAreaProps) {
+export default function ChatArea({
+  selectedChat,
+  setSelectedChat,
+  setActiveChat,
+  friends,
+  setFriends,
+  setSearchQuery,
+  onInfoClick,
+  onBack,
+}: ChatAreaProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<IMessage[]>([]);
-  const id = useAuthStore((state) => state.id);
   const chatRef = useRef<HTMLDivElement>(null);
-  const socket = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
+  const socket = useRef(io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true })).current;
+
+  const { id } = useAuthStore();
 
   useEffect(() => {
     if (chatRef.current) {
@@ -32,23 +48,49 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
   }, [messages.length]);
 
   useEffect(() => {
-    if (selectedChat) {
-      console.log(selectedChat);
-      socket.emit('setup', selectedChat.id);
-    }
-  }, [selectedChat, socket]);
+    socket.emit('self join', id);
+
+    return () => {
+      socket.off('self join');
+    };
+  }, [id]);
 
   useEffect(() => {
-    socket.on('message recieved', (message) => {
+    if (selectedChat && selectedChat.type !== 'search') {
+      socket.emit('setup', selectedChat.id);
+    }
+
+    return () => {
+      socket.off('setup');
+    };
+  }, [selectedChat]);
+
+  useEffect(() => {
+    const handleAddCommunity = (frnd: IFriendCommunity) => {
+      setFriends([...friends, frnd]);
+    };
+
+    socket.on('add community', handleAddCommunity);
+
+    return () => {
+      socket.off('add community', handleAddCommunity);
+    };
+  }, [friends, setFriends]);
+
+  useEffect(() => {
+    const handleMessageReceived = (message: IMessage) => {
       setMessages((prevMessages) => [...prevMessages, message]);
-    });
+    };
+
+    socket.on('message received', handleMessageReceived);
+
+    return () => {
+      socket.off('message received', handleMessageReceived);
+    };
   }, [socket]);
 
   useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }
-    if (message.length !== 0) return;
+    setMessage('');
     const fetch = async () => {
       if (!selectedChat) return;
       const chats = await getMessage(selectedChat.id);
@@ -58,17 +100,36 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
       }
     };
     fetch();
-  }, [selectedChat, message.length]);
+  }, [selectedChat]);
+
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [selectedChat]);
 
   async function onHandleSubmit() {
     if (!selectedChat) return;
     setMessage(message.trim());
     if (message === '') return;
-    const chat = await createMessage(message, 'text', selectedChat.id);
+    let chat: IMessage | CreateMessageResponse | null;
+    if (selectedChat.type !== 'search') chat = await createMessage(message, 'text', selectedChat.id);
+    else chat = await createMessageAndCommunity(message, 'text', selectedChat.id, 'group');
     if (!chat) return;
-    setMessages([
-      ...messages,
-      {
+    if ('id' in chat) {
+      setMessages([
+        ...messages,
+        {
+          id: chat.id,
+          content: chat.content,
+          type: chat.type,
+          communityId: chat.communityId,
+          isDeleted: chat.isDeleted,
+          timestamp: chat.timestamp,
+          user: chat.user,
+        },
+      ]);
+      socket.emit('new message', {
         id: chat.id,
         content: message,
         type: chat.type,
@@ -76,18 +137,57 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
         isDeleted: chat.isDeleted,
         timestamp: chat.timestamp,
         user: chat.user,
-      },
-    ]);
-    socket.emit('new message', {
-      id: chat.id,
-      content: message,
-      type: chat.type,
-      communityId: chat.communityId,
-      isDeleted: chat.isDeleted,
-      timestamp: chat.timestamp,
-      user: chat.user,
-    });
+      });
+    } else {
+      setMessages([
+        ...messages,
+        {
+          id: chat.message.id,
+          content: chat.message.content,
+          type: chat.message.type,
+          communityId: chat.message.communityId,
+          isDeleted: chat.message.isDeleted,
+          timestamp: chat.message.timestamp,
+          user: chat.message.user,
+        },
+      ]);
+      const frnd = chat.community;
+
+      // socket.emit('add friend', {
+      //   id: frnd.id,
+      //   type: frnd.type,
+      //   users: frnd.users,
+      //   friend: {
+      //     id,
+      //     name,
+      //     email,
+      //     username,
+      //     avatar,
+      //   },
+      //   userId: frnd.friend.id,
+      // });
+      setFriends([...friends, frnd]);
+      setActiveChat('friend');
+      // socket.emit('setup', chat.community.id);
+      setSelectedChat({
+        id: chat.community.id,
+        avatar: chat.community.friend.avatar,
+        name: chat.community.friend.name,
+        type: 'friend',
+        users: chat.community.users,
+      });
+      // socket.emit('new message', {
+      //   id: chat.message.id,
+      //   content: chat.message.content,
+      //   type: chat.message.type,
+      //   communityId: chat.message.communityId,
+      //   isDeleted: chat.message.isDeleted,
+      //   timestamp: chat.message.timestamp,
+      //   user: chat.message.user,
+      // });
+    }
     setMessage('');
+    setSearchQuery('');
   }
 
   const chatInfo = { name: selectedChat?.name, avatar: selectedChat?.avatar };
@@ -111,7 +211,9 @@ export default function ChatArea({ selectedChat, onInfoClick, onBack }: ChatArea
             <div>
               <h2 className="font-medium text-gray-900">{chatInfo.name}</h2>
               <p className="text-sm text-gray-500">
-                {selectedChat.type === 'friend' ? 'Online' : `${selectedChat.users} members`}
+                {selectedChat.type === 'friend' || selectedChat.type === 'search'
+                  ? 'Online'
+                  : `${selectedChat.users} members`}
               </p>
             </div>
           </div>
